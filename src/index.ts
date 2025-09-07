@@ -1,10 +1,9 @@
 import express from 'express';
-import { imageRouter } from './routes/imageRouter.js';
+import { BaseRouter } from './routes/BaseRouter.js';
 
-export const app = express();
 const port = 3000;
+export const app = express();
+app.use("/api",BaseRouter);
 app.listen(port, () => {
   console.log(`Api is running at port ${port}`);
 });
-
-app.use(imageRouter);
