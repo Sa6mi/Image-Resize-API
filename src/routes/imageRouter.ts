@@ -1,24 +1,9 @@
 import { Router, type Request, type Response } from 'express';
-import sharp from 'sharp';
-import fs, { promises as fsPromises } from 'fs';
-import path from 'path';
+import { proccessImage } from '../utils/imageProcessor.js';
+import fs from "fs"
 export const imageRouter = Router();
 
-const outPutPath = './outputImages';
-imageRouter.get('/', async (req: Request, res: Response) => {
-const timestamp = new Date().toLocaleString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false,
-        timeZoneName: 'short'
-});
-  if (!fs.existsSync(outPutPath)) {
-    fs.mkdirSync(outPutPath);
-  }
+imageRouter.get('/', async (req: Request, res: Response): Promise<Response | void> => {
   const query = req.query;
 
   if (!query.filename) {
@@ -30,26 +15,18 @@ const timestamp = new Date().toLocaleString('en-US', {
   if (!query.height) {
     return res.status(400).send('No height entered');
   }
-
-  const outputFilePath = `${outPutPath}/${query.filename}-resized-${query.width}x${query.height}.jpg`;
-  if (fs.existsSync(outputFilePath)) {
-    const operation = `Accessed Resized Image: ${query.filename} ${query.width}x${query.height}`;
-    const loggingfile = await fsPromises.open('Logger.txt', 'a+');
-    loggingfile.write(`[${timestamp}]: ${operation} \n`);
-    return res.sendFile(path.resolve(outputFilePath));
+  const width = Number(query.width);
+  const height = Number(query.height);  
+  if (isNaN(width) || width <= 0 ||!Number.isInteger(width)|| isNaN(height) || height <= 0 ||!Number.isInteger(height)) {
+    return res.status(400).send('Height And Width must be positive integers');
   }
-  sharp(`./images/${query.filename}.jpg`)
-    .resize(Number(query.width), Number(query.height))
-    .toFile(outputFilePath)
-    .then(() => {
-      res.sendFile(path.resolve(outputFilePath));
-    })
-    .then(async () => {
-      const operation = `Resized Image: ${query.filename} to ${query.width}x${query.height}`;
-      const loggingfile = await fsPromises.open('Logger.txt', 'a+');
-      loggingfile.write(`[${timestamp}]: ${operation}\n`);
-    })
-    .catch(() => {
-      res.status(500).send('Error processing image');
-    });
+  const result = await proccessImage(query.filename as string, width, height);
+  
+  if (result.success && result.outputPath) {
+    res.status(200).sendFile(result.outputPath);
+  } else if (result.error === 'FILE_NOT_FOUND') {
+    res.status(404).send('Image file is not found');
+  } else {
+    res.status(500).send('Error processing image');
+  }
 });
